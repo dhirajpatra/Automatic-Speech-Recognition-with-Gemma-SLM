@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASR Demo - Speech to Text</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 90%;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+        }
+        
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            transition: border-color 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-area.dragover {
+            border-color: #667eea;
+            background-color: #f8f9ff;
+        }
+        
+        .upload-area input[type="file"] {
+            display: none;
+        }
+        
+        .upload-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.3s ease;
+        }
+        
+        .upload-btn:hover {
+            background: #5a6fd8;
+        }
+        
+        .upload-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .record-section {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: #f8f9ff;
+            border-radius: 10px;
+        }
+        
+        .record-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .record-btn:hover {
+            background: #c0392b;
+            transform: scale(1.05);
+        }
+        
+        .record-btn.recording {
+            background: #27ae60;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .status {
+            text-align: center;
+            margin: 1rem 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .results {
+            margin-top: 2rem;
+        }
+        
+        .result-section {
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            background: #f8f9ff;
+        }
+        
+        .result-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .result-text {
+            color: #555;
+            line-height: 1.6;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .health-status {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        
+        .health-healthy {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .health-unhealthy {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .processing-time {
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+        }
+        
+        .icon {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+    </style>
+</head>
+<body>
+    <div class="health-status" id="healthStatus">Checking...</div>
+    
+    <div class="container">
+        <h1>🎙️ ASR Demo</h1>
+        <p style="text-align: center; color: #666; margin-bottom: 2rem;">
+            Automatic Speech Recognition with Whisper + Ollama Gemma
+        </p>
+        
+        <!-- Recording Section -->
+        <div class="record-section">
+            <h3>🎵 Record Audio</h3>
+            <button id="recordBtn" class="record-btn">Start Recording</button>
+            <button id="stopBtn" class="record-btn" style="background: #f39c12; display: none;">Stop Recording</button>
+            <div id="recordingTime" style="margin-top: 10px; font-weight: bold; color: #e74c3c;"></div>
+        </div>
+        
+        <!-- File Upload Section -->
+        <div class="upload-area" id="uploadArea">
+            <input type="file" id="audioFile" accept="audio/*">
+            <div>
+                <svg class="icon" viewBox="0 0 24 24">
+                    <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                </svg>
+                <p>Drop audio file here or click to browse</p>
+                <p style="color: #666; font-size: 0.9rem;">Supported formats: MP3, WAV, M4A, OGG</p>
+            </div>
+            <button class="upload-btn" id="uploadBtn">Choose File</button>
+        </div>
+        
+        <!-- Status -->
+        <div id="status" class="status" style="display: none;"></div>
+        
+        <!-- Transcribe Button -->
+        <div style="text-align: center; margin: 1rem 0;">
+            <button id="transcribeBtn" class="upload-btn" style="background: #27ae60; font-size: 1.1rem;" disabled>
+                🎯 Transcribe Audio
+            </button>
+        </div>
+        
+        <!-- Results -->
+        <div id="results" class="results" style="display: none;">
+            <div class="result-section">
+                <div class="result-title">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z" />
+                    </svg>
+                    Raw Transcription (Whisper)
+                </div>
+                <div id="rawTranscription" class="result-text"></div>
+            </div>
+            
+            <div class="result-section">
+                <div class="result-title">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M12,2A2,2 0 0,1 14,4A2,2 0 0,1 12,6A2,2 0 0,1 10,4A2,2 0 0,1 12,2M21,9V7L15,1H5C3.89,1 3,1.89 3,3V21A2,2 0 0,0 5,23H19A2,2 0 0,0 21,21V9M19,9H14V4H15.5L19,7.5V9Z" />
+                    </svg>
+                    Enhanced Text (Ollama Gemma)
+                </div>
+                <div id="enhancedText" class="result-text"></div>
+            </div>
+            
+            <div id="processingTime" class="processing-time"></div>
+        </div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordingInterval;
+        let recordingStartTime;
+        let selectedFile = null;
+
+        // DOM elements
+        const uploadArea = document.getElementById('uploadArea');
+        const audioFile = document.getElementById('audioFile');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const transcribeBtn = document.getElementById('transcribeBtn');
+        const recordBtn = document.getElementById('recordBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const status = document.getElementById('status');
+        const results = document.getElementById('results');
+        const healthStatus = document.getElementById('healthStatus');
+        const recordingTime = document.getElementById('recordingTime');
+
+        // Check service health
+        async function checkHealth() {
+            try {
+                const response = await fetch('/api/health');
+                const health = await response.json();
+                
+                if (health.status === 'healthy' && health.whisper_loaded) {
+                    healthStatus.textContent = '🟢 Service Ready';
+                    healthStatus.className = 'health-status health-healthy';
+                } else {
+                    healthStatus.textContent = '🟡 Service Starting';
+                    healthStatus.className = 'health-status health-unhealthy';
+                }
+            } catch (error) {
+                healthStatus.textContent = '🔴 Service Down';
+                healthStatus.className = 'health-status health-unhealthy';
+            }
+        }
+
+        // Recording functionality
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    selectedFile = new File([audioBlob], 'recording.wav', { type: 'audio/wav' });
+                    transcribeBtn.disabled = false;
+                    showStatus('Recording saved! Ready to transcribe.', 'success');
+                };
+
+                mediaRecorder.start();
+                recordBtn.style.display = 'none';
+                stopBtn.style.display = 'inline-block';
+                recordBtn.classList.add('recording');
+                
+                recordingStartTime = Date.now();
+                recordingInterval = setInterval(updateRecordingTime, 100);
+                
+                showStatus('Recording... Speak now!', 'loading');
+            } catch (error) {
+                showStatus('Microphone access denied or not available.', 'error');
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                recordBtn.style.display = 'inline-block';
+                stopBtn.style.display = 'none';
+                recordBtn.classList.remove('recording');
+                clearInterval(recordingInterval);
+                recordingTime.textContent = '';
+            }
+        }
+
+        function updateRecordingTime() {
+            const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+            recordingTime.textContent = `Recording: ${elapsed}s`;
+        }
+
+        // File handling
+        function handleFileSelect(file) {
+            if (file && file.type.startsWith('audio/')) {
+                selectedFile = file;
+                transcribeBtn.disabled = false;
+                showStatus(`File selected: ${file.name}`, 'success');
+            } else {
+                showStatus('Please select a valid audio file.', 'error');
+            }
+        }
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect(files[0]);
+            }
+        });
+
+        uploadArea.addEventListener('click', () => audioFile.click());
+        uploadBtn.addEventListener('click', () => audioFile.click());
+        audioFile.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+
+        // Recording controls
+        recordBtn.addEventListener('click', startRecording);
+        stopBtn.addEventListener('click', stopRecording);
+
+        // Transcription
+        transcribeBtn.addEventListener('click', async () => {
+            if (!selectedFile) {
+                showStatus('Please select or record an audio file first.', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('audio_file', selectedFile);
+
+            transcribeBtn.disabled = true;
+            showStatus('Transcribing audio... This may take a moment.', 'loading');
+            results.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                document.getElementById('rawTranscription').textContent = result.transcription;
+                document.getElementById('enhancedText').textContent = result.enhanced_text;
+                document.getElementById('processingTime').textContent = 
+                    `Processing time: ${result.processing_time.toFixed(2)} seconds`;
+                
+                results.style.display = 'block';
+                showStatus('Transcription completed successfully!', 'success');
+                
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+                console.error('Transcription error:', error);
+            } finally {
+                transcribeBtn.disabled = false;
+            }
+        });
+
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // Initialize
+        checkHealth();
+        setInterval(checkHealth, 30000); // Check every 30 seconds
+    </script>
+</body>
+</html>

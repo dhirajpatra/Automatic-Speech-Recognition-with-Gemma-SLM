@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: asr_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  asr-service:
+    build: 
+      context: ./asr-service
+      dockerfile: Dockerfile
+    container_name: asr_service
+    ports:
+      - "8000:8000"
+    depends_on:
+      - ollama
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - MODEL_NAME=gemma2:2b
+    volumes:
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+
+  web-ui:
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile
+    container_name: asr_web_ui
+    ports:
+      - "3000:80"
+    depends_on:
+      - asr-service
+    environment:
+      - ASR_SERVICE_URL=http://asr-service:8000
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
