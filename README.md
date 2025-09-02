@@ -90,7 +90,7 @@ Open your browser and navigate to: **http://localhost:3000**
 **ASR Service:**
 ```env
 OLLAMA_BASE_URL=http://ollama:11434
-MODEL_NAME=gemma2:2b
+MODEL_NAME=gemma3n:2b
 ```
 
 **Docker Compose:**
