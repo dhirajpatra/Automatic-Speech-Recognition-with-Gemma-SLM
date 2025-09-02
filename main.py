@@ -17,7 +17,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="ASR Service", version="1.0.0")
+app = FastAPI(title="ASR/AST Service", version="1.0.0")
 
 # CORS middleware
 app.add_middleware(
@@ -30,21 +30,57 @@ app.add_middleware(
 
 # Configuration
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-MODEL_NAME = os.getenv("MODEL_NAME", "gemma2:2b")
+MODEL_NAME = os.getenv("MODEL_NAME", "gemma3n:2b")
 
 # Global variables
 whisper_model = None
 ollama_available = False
+
+# Supported languages for translation
+SUPPORTED_LANGUAGES = {
+    "en": "English",
+    "es": "Spanish", 
+    "fr": "French",
+    "de": "German",
+    "it": "Italian",
+    "pt": "Portuguese",
+    "ru": "Russian",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "zh": "Chinese",
+    "ar": "Arabic",
+    "hi": "Hindi",
+    "tr": "Turkish",
+    "pl": "Polish",
+    "nl": "Dutch"
+}
 
 class TranscriptionResponse(BaseModel):
     transcription: str
     enhanced_text: str
     processing_time: float
 
+class TranslationResponse(BaseModel):
+    original_text: str
+    translated_text: str
+    source_language: str
+    target_language: str
+    processing_time: float
+
+class ASRTranslationResponse(BaseModel):
+    transcription: str
+    enhanced_text: str
+    translated_text: str
+    target_language: str
+    processing_time: float
+
 class HealthResponse(BaseModel):
     status: str
     whisper_loaded: bool
     ollama_available: bool
+
+class SupportedLanguagesResponse(BaseModel):
+    languages: dict
 
 @app.on_event("startup")
 async def startup_event():
@@ -101,7 +137,67 @@ def transcribe_audio(audio_file):
         logger.error(f"Transcription error: {e}")
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
 
-def enhance_text_with_ollama(text: str) -> str:
+def translate_text_with_ollama(text: str, target_language: str, source_language: str = "auto") -> str:
+    """Translate text using Ollama Gemma"""
+    if not ollama_available:
+        return text
+    
+    try:
+        # Get full language names
+        target_lang_name = SUPPORTED_LANGUAGES.get(target_language, target_language)
+        source_lang_name = SUPPORTED_LANGUAGES.get(source_language, "auto-detected language") if source_language != "auto" else "auto-detected language"
+        
+        prompt = f"""Translate the following text from {source_lang_name} to {target_lang_name}. 
+Provide only the translation without any explanations or additional text.
+
+Text to translate: "{text}"
+
+Translation in {target_lang_name}:"""
+
+        response = requests.post(
+            f"{OLLAMA_BASE_URL}/api/generate",
+            json={
+                "model": MODEL_NAME,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.3,
+                    "top_k": 40,
+                    "top_p": 0.9,
+                    "num_predict": 300
+                }
+            },
+            timeout=45
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            translated = result.get("response", text).strip()
+            
+            # Clean up the response (remove any prompt echoing or quotes)
+            if translated.startswith('"') and translated.endswith('"'):
+                translated = translated[1:-1]
+            
+            # Remove common prefixes that might appear
+            prefixes_to_remove = [
+                "Translation:", "Translation in", f"{target_lang_name}:", 
+                "Here is the translation:", "The translation is:"
+            ]
+            
+            for prefix in prefixes_to_remove:
+                if translated.lower().startswith(prefix.lower()):
+                    translated = translated[len(prefix):].strip()
+                    if translated.startswith(':'):
+                        translated = translated[1:].strip()
+            
+            return translated
+        else:
+            logger.warning(f"Translation request failed: {response.status_code}")
+            return text
+            
+    except Exception as e:
+        logger.error(f"Translation error: {e}")
+        return text
     """Enhance transcribed text using Ollama Gemma"""
     if not ollama_available:
         return text
@@ -181,6 +277,91 @@ async def transcribe_audio_endpoint(audio_file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Transcription endpoint error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/translate", response_model=TranslationResponse)
+async def translate_text_endpoint(
+    text: str,
+    target_language: str,
+    source_language: str = "auto"
+):
+    """Translate text endpoint"""
+    import time
+    start_time = time.time()
+    
+    if target_language not in SUPPORTED_LANGUAGES:
+        raise HTTPException(status_code=400, detail=f"Unsupported target language: {target_language}")
+    
+    try:
+        translated_text = translate_text_with_ollama(text, target_language, source_language)
+        processing_time = time.time() - start_time
+        
+        logger.info(f"Translation completed in {processing_time:.2f}s")
+        
+        return TranslationResponse(
+            original_text=text,
+            translated_text=translated_text,
+            source_language=source_language,
+            target_language=target_language,
+            processing_time=processing_time
+        )
+        
+    except Exception as e:
+        logger.error(f"Translation endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/transcribe-and-translate", response_model=ASRTranslationResponse)
+async def transcribe_and_translate_endpoint(
+    audio_file: UploadFile = File(...),
+    target_language: str = "en"
+):
+    """Combined ASR + AST endpoint"""
+    import time
+    start_time = time.time()
+    
+    if not whisper_model:
+        raise HTTPException(status_code=503, detail="Whisper model not loaded")
+    
+    if target_language not in SUPPORTED_LANGUAGES:
+        raise HTTPException(status_code=400, detail=f"Unsupported target language: {target_language}")
+    
+    # Validate file type
+    if not audio_file.content_type.startswith("audio/"):
+        raise HTTPException(status_code=400, detail="File must be an audio file")
+    
+    try:
+        # Read audio file
+        audio_data = await audio_file.read()
+        
+        # Transcribe
+        logger.info(f"Transcribing and translating audio file: {audio_file.filename}")
+        transcription = transcribe_audio(audio_data)
+        
+        # Enhance with Ollama
+        enhanced_text = enhance_text_with_ollama(transcription)
+        
+        # Translate enhanced text
+        translated_text = translate_text_with_ollama(enhanced_text, target_language)
+        
+        processing_time = time.time() - start_time
+        
+        logger.info(f"ASR+AST completed in {processing_time:.2f}s")
+        
+        return ASRTranslationResponse(
+            transcription=transcription,
+            enhanced_text=enhanced_text,
+            translated_text=translated_text,
+            target_language=target_language,
+            processing_time=processing_time
+        )
+        
+    except Exception as e:
+        logger.error(f"ASR+AST endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/supported-languages", response_model=SupportedLanguagesResponse)
+async def get_supported_languages():
+    """Get supported languages for translation"""
+    return SupportedLanguagesResponse(languages=SUPPORTED_LANGUAGES)
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():

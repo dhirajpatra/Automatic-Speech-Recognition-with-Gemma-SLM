@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ASR Demo - Speech to Text</title>
+    <title>ASR/AST Demo - Speech to Text & Translation</title>
     <style>
         * {
             margin: 0;
@@ -183,7 +183,116 @@
             color: #721c24;
         }
         
-        .processing-time {
+        .tab-container {
+            display: flex;
+            margin-bottom: 2rem;
+            background: #f8f9ff;
+            border-radius: 10px;
+            padding: 5px;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 12px 20px;
+            text-align: center;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            color: #666;
+        }
+        
+        .tab.active {
+            background: #667eea;
+            color: white;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .language-selector {
+            margin: 1rem 0;
+            text-align: center;
+        }
+        
+        .language-selector select {
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+            cursor: pointer;
+            min-width: 200px;
+        }
+        
+        .language-selector select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .translate-section {
+            background: #f8f9ff;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+        }
+        
+        .translate-input {
+            width: 100%;
+            min-height: 100px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            resize: vertical;
+            margin-bottom: 15px;
+        }
+        
+        .translate-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 1rem 0;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.3s ease;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .btn-secondary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .result-section.translation {
+            border-left-color: #28a745;
+        }
             text-align: center;
             color: #666;
             font-size: 0.9rem;
@@ -201,10 +310,26 @@
     <div class="health-status" id="healthStatus">Checking...</div>
     
     <div class="container">
-        <h1>🎙️ ASR Demo</h1>
+        <h1>🎙️ ASR/AST Demo</h1>
         <p style="text-align: center; color: #666; margin-bottom: 2rem;">
-            Automatic Speech Recognition with Whisper + Ollama Gemma
+            Automatic Speech Recognition & Translation with Whisper + Ollama Gemma
         </p>
+        
+        <!-- Tab Navigation -->
+        <div class="tab-container">
+            <button class="tab active" onclick="switchTab('asr')">
+                🎯 Speech Recognition
+            </button>
+            <button class="tab" onclick="switchTab('ast')">
+                🌍 Speech Translation  
+            </button>
+            <button class="tab" onclick="switchTab('translate')">
+                📝 Text Translation
+            </button>
+        </div>
+        
+        <!-- ASR Tab -->
+        <div id="asr-tab" class="tab-content active">
         
         <!-- Recording Section -->
         <div class="record-section">
@@ -236,13 +361,141 @@
                 🎯 Transcribe Audio
             </button>
         </div>
+        </div>
+        
+        <!-- AST Tab -->
+        <div id="ast-tab" class="tab-content">
+            <!-- Recording Section -->
+            <div class="record-section">
+                <h3>🎵 Record Audio for Translation</h3>
+                <button id="recordBtn2" class="record-btn">Start Recording</button>
+                <button id="stopBtn2" class="record-btn" style="background: #f39c12; display: none;">Stop Recording</button>
+                <div id="recordingTime2" style="margin-top: 10px; font-weight: bold; color: #e74c3c;"></div>
+            </div>
+            
+            <!-- Language Selection -->
+            <div class="language-selector">
+                <label for="targetLanguage">Translate to:</label>
+                <select id="targetLanguage">
+                    <option value="en">English</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="it">Italian</option>
+                    <option value="pt">Portuguese</option>
+                    <option value="ru">Russian</option>
+                    <option value="ja">Japanese</option>
+                    <option value="ko">Korean</option>
+                    <option value="zh">Chinese</option>
+                    <option value="ar">Arabic</option>
+                    <option value="hi">Hindi</option>
+                    <option value="tr">Turkish</option>
+                    <option value="pl">Polish</option>
+                    <option value="nl">Dutch</option>
+                </select>
+            </div>
+            
+            <!-- File Upload Section -->
+            <div class="upload-area" id="uploadArea2">
+                <input type="file" id="audioFile2" accept="audio/*">
+                <div>
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                    </svg>
+                    <p>Drop audio file here or click to browse</p>
+                    <p style="color: #666; font-size: 0.9rem;">Supported formats: MP3, WAV, M4A, OGG</p>
+                </div>
+                <button class="upload-btn" id="uploadBtn2">Choose File</button>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button id="transcribeTranslateBtn" class="upload-btn" style="background: #e74c3c;" disabled>
+                    🌍 Transcribe & Translate
+                </button>
+            </div>
+        </div>
+        
+        <!-- Text Translation Tab -->
+        <div id="translate-tab" class="tab-content">
+            <div class="translate-section">
+                <h3>📝 Translate Text</h3>
+                
+                <div class="language-selector">
+                    <label for="translateTargetLanguage">Translate to:</label>
+                    <select id="translateTargetLanguage">
+                        <option value="en">English</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="it">Italian</option>
+                        <option value="pt">Portuguese</option>
+                        <option value="ru">Russian</option>
+                        <option value="ja">Japanese</option>
+                        <option value="ko">Korean</option>
+                        <option value="zh">Chinese</option>
+                        <option value="ar">Arabic</option>
+                        <option value="hi">Hindi</option>
+                        <option value="tr">Turkish</option>
+                        <option value="pl">Polish</option>
+                        <option value="nl">Dutch</option>
+                    </select>
+                </div>
+                
+                <textarea 
+                    id="textToTranslate" 
+                    class="translate-input" 
+                    placeholder="Enter text to translate..."
+                ></textarea>
+                
+                <div class="action-buttons">
+                    <button id="translateTextBtn" class="upload-btn" style="background: #17a2b8;">
+                        🔄 Translate Text
+                    </button>
+                    <button id="useTranscriptionBtn" class="btn-secondary" disabled>
+                        📋 Use Last Transcription
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Status (shared across tabs) -->
+        <div id="status" class="status" style="display: none;"></div>
         
         <!-- Results -->
         <div id="results" class="results" style="display: none;">
-            <div class="result-section">
+            <div class="result-section" id="rawTranscriptionSection">
                 <div class="result-title">
                     <svg class="icon" viewBox="0 0 24 24">
                         <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z" />
+                    </svg>
+                    Raw Transcription (Whisper)
+                </div>
+                <div id="rawTranscription" class="result-text"></div>
+            </div>
+            
+            <div class="result-section" id="enhancedTextSection">
+                <div class="result-title">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M12,2A2,2 0 0,1 14,4A2,2 0 0,1 12,6A2,2 0 0,1 10,4A2,2 0 0,1 12,2M21,9V7L15,1H5C3.89,1 3,1.89 3,3V21A2,2 0 0,0 5,23H19A2,2 0 0,0 21,21V9M19,9H14V4H15.5L19,7.5V9Z" />
+                    </svg>
+                    Enhanced Text (Ollama Gemma)
+                </div>
+                <div id="enhancedText" class="result-text"></div>
+            </div>
+            
+            <div class="result-section translation" id="translatedTextSection" style="display: none;">
+                <div class="result-title">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M12.87,15.07L10.33,12.56L10.36,12.53C12.1,10.59 13.34,8.36 14.07,6H17V4H10V2H8V4H1V6H12.17C11.5,7.92 10.44,9.75 9,11.35C8.07,10.32 7.3,9.19 6.69,8H4.69C5.42,9.63 6.42,11.17 7.67,12.56L2.58,17.58L4,19L9,14L12.11,17.11L12.87,15.07M18.5,10H16.5L12,22H14L15.12,19H19.87L21,22H23L18.5,10M15.88,17L17.5,12.67L19.12,17H15.88Z" />
+                    </svg>
+                    Translation (<span id="targetLangDisplay">English</span>)
+                </div>
+                <div id="translatedText" class="result-text"></div>
+            </div>
+            
+            <div id="processingTime" class="processing-time"></div>
+        </div><path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z" />
                     </svg>
                     Raw Transcription (Whisper)
                 </div>

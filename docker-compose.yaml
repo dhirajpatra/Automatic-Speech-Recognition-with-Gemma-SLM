@@ -28,7 +28,7 @@ services:
       - ollama
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
-      - MODEL_NAME=gemma2:2b
+      - MODEL_NAME=gemma3n:2b
     volumes:
       - ./uploads:/app/uploads
     restart: unless-stopped
