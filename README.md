@@ -2,6 +2,10 @@
 
 A lightweight microservice demo for Automatic Speech Recognition using **Whisper** for transcription and **Ollama Gemma** for text enhancement.
 
+![Alt text](images/1.png)
+![Alt text](images/2.png)
+![Alt text](images/3.png)
+
 ## 🏗️ Architecture
 
 ```

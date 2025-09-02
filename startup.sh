@@ -4,12 +4,6 @@
 echo "🚀 Starting ASR Demo with Ollama Gemma"
 echo "======================================"
 
-# Create project structure
-mkdir -p asr-demo/{asr-service,web-ui}
-cd asr-demo
-
-echo "📁 Creating project structure..."
-
 # Create ASR service files
 echo "🔧 Setting up ASR service..."
 mkdir -p asr-service/uploads
@@ -24,9 +18,9 @@ echo "✅ Project structure created!"
 echo ""
 echo "📋 Next steps:"
 echo "1. Copy all the files to their respective directories:"
-echo "   - docker-compose.yml -> ./asr-demo/"
-echo "   - ASR service files -> ./asr-demo/asr-service/"
-echo "   - Web UI files -> ./asr-demo/web-ui/"
+echo "   - docker-compose.yml -> ./"
+echo "   - ASR service files -> ./asr-service/"
+echo "   - Web UI files -> ./web-ui/"
 echo ""
 echo "2. Navigate to the project directory:"
 echo "   cd asr-demo"
@@ -68,7 +62,7 @@ start_services() {
     docker pull ollama/ollama:latest
     
     # Build and start services
-    docker-compose up --build -d
+    docker compose up --build -d
     
     echo "⏳ Waiting for services to start..."
     sleep 10
@@ -92,7 +86,7 @@ start_services() {
     curl -s -X POST http://localhost:11434/api/pull -d '{"name":"gemma2:2b"}' &
     
     echo "🎉 Services started! Check status with:"
-    echo "   docker-compose ps"
+    echo "   docker compose ps"
     echo ""
     echo "🌐 Access the demo at: http://localhost:3000"
 }
